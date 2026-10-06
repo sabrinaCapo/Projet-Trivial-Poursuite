@@ -1,0 +1,23 @@
+# Scraping de l'API OpenTDB
+requests
+
+# Manipulation des données et fichiers Parquet
+pandas
+pyarrow
+
+# Interrogation des modèles IA locaux (Ollama)
+ollama
+
+# Base analytique (couche gold) et lecture des Parquet
+duckdb
+
+# Transformations SQL, lignage et tests
+dbt-core
+dbt-duckdb
+
+# Dashboard interactif et graphiques
+streamlit
+plotly
+
+# truststore fait utiliser à Python les certificats de Windows au lieu de sa propre liste
+truststore
