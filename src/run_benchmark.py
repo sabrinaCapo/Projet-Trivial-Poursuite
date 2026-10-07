@@ -6,9 +6,6 @@ Une ligne par (question, modèle, prompt) : question_id, model, prompt_id,
 correct_letter, ai_answer, response_time, error.
 `ai_correct` est calculé plus tard, dans dbt (couche intermediate).
 
-Exemples :
-    python src/run_benchmark.py --limit 50     # test sur 50 questions
-    python src/run_benchmark.py --limit 0      # toutes les questions
 """
 
 import argparse
@@ -28,8 +25,10 @@ OUTPUT_PATH = Path("data/silver/model_answers.parquet")
 SAVE_EVERY = 50  # sauvegarde régulière pour pouvoir reprendre
 
 LETTERS = "ABCDEFGH"  # lettres attribuées aux choix
+FREE_PROMPT = "p3_libre"  # prompt sans choix : réponse libre
 
-# Prompts standardisés (le prompt_id est conservé dans le dataset)
+# Prompts standardisés (le prompt_id est conservé dans le dataset).
+# Ne jamais renommer ni modifier un prompt après un run.
 PROMPTS = {
     "p1_english": (
         "Answer with the letter of the correct choice only, nothing else.\n"
@@ -39,11 +38,19 @@ PROMPTS = {
         "Réponds uniquement par la lettre du bon choix, rien d'autre.\n"
         "Question : {question}\n{choices}\nRéponse :"
     ),
+    FREE_PROMPT: (
+        "Answer with the answer only, a few words, no explanation.\n"
+        "Question: {question}\nAnswer:"
+    ),
 }
 
 
 def build_prompt(prompt_id: str, row) -> tuple[str, str]:
     """Retourne (prompt, lettre de la bonne réponse)."""
+    # Prompt libre : pas de choix, donc pas de lettre
+    if prompt_id == FREE_PROMPT:
+        return PROMPTS[prompt_id].format(question=row.question), ""
+
     # Bonne réponse + mauvaises réponses
     choices = json.loads(row.incorrect_answers) + [row.correct_answer]
     # Mélange stable : même ordre pour une même question
@@ -56,13 +63,13 @@ def build_prompt(prompt_id: str, row) -> tuple[str, str]:
     return prompt, correct_letter
 
 
-def ask_model(model: str, prompt: str) -> tuple[str | None, float, str | None]:
+def ask_model(model: str, prompt: str, max_tokens: int = 16) -> tuple[str | None, float, str | None]:
     """Retourne (réponse, temps en secondes, erreur éventuelle)."""
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0,  # réponses reproductibles
-        "max_tokens": 16,  # réponse courte : une lettre suffit
+        "max_tokens": max_tokens,  # 16 pour une lettre, 40 pour une réponse libre
     }
     start = time.perf_counter()  # début du chronomètre
     try:
@@ -105,7 +112,8 @@ def main() -> None:
                 if (row.question_id, model, prompt_id) in done:
                     continue
                 prompt, correct_letter = build_prompt(prompt_id, row)
-                answer, seconds, error = ask_model(model, prompt)
+                max_tokens = 40 if prompt_id == FREE_PROMPT else 16
+                answer, seconds, error = ask_model(model, prompt, max_tokens)
                 rows.append({
                     "question_id": row.question_id,
                     "model": model,
@@ -121,7 +129,7 @@ def main() -> None:
                     print(f"{count}/{total} réponses")
 
     save(rows)
-    errors = sum(1 for r in rows if r["error"])
+    errors = sum(1 for r in rows if pd.notna(r["error"]))
     print(f"Terminé : {len(rows)} réponses, {errors} erreurs -> {OUTPUT_PATH}")
 
 

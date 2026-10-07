@@ -3,17 +3,22 @@
 Pipeline de data engineering qui évalue un modèle d'IA local (LM Studio) sur le dataset Open Trivia Database (OpenTDB). Architecture en médaillon (bronze, silver, gold), transformations avec dbt et dashboard Streamlit.
 
 **Auteurs** : _à compléter (noms du binôme)_
-**Avancement** : bronze OK, silver OK, dbt OK, dashboard OK. Run final sur échantillon en cours, résultats à compléter.
+**Avancement** : bronze, silver, dbt et dashboard terminés. Résultats finaux à compléter (section 7).
 
 ---
 
 ## 1. Objectif
 
-Mesurer les performances d'un modèle d'IA sur des questions de culture générale :
-- taux de bonnes réponses global, par catégorie, par difficulté et type de question,
-- temps de réponse,
-- impact de la formulation du prompt (langue de la consigne),
-- respect du format de réponse demandé.
+Mesurer les performances d'un modèle d'IA sur des questions de culture générale et répondre à six questions métier :
+
+| Question métier | Table gold |
+|---|---|
+| Quel prompt donne les meilleurs résultats, et le modèle suit-il le format demandé ? | `accuracy_by_prompt` |
+| Dans quelles catégories le modèle est-il le plus fort ou le plus faible ? | `accuracy_by_category` |
+| La difficulté et le type de question changent-ils le score ? | `accuracy_by_difficulty` |
+| Le temps de réponse dépend-il de la réussite et de la difficulté ? | `response_time_analysis` |
+| Le modèle réagit-il de la même façon à une consigne en anglais et en français ? | `prompt_consistency` |
+| Combien de questions, d'appels et d'erreurs dans le run ? | `run_summary` |
 
 ## 2. Architecture
 
@@ -58,8 +63,9 @@ LM Studio (https://lmstudio.ai) puis, dans un terminal :
 
 ```bash
 lms get https://huggingface.co/lmstudio-community/Llama-3.2-1B-Instruct-GGUF
-lms load llama-3.2-1b-instruct
+lms load llama-3.2-1b-instruct      # à refaire après chaque redémarrage
 lms server start
+lms ps                              # vérifie que le modèle est bien chargé
 ```
 
 ## 5. Exécution du pipeline
@@ -67,7 +73,7 @@ lms server start
 ```bash
 python src/scrap.py                       # bronze
 python src/build_silver.py                # silver : questions
-python src/run_benchmark.py --limit 500   # silver : réponses du modèle (0 = tout)
+python src/run_benchmark.py --limit 300   # silver : réponses du modèle (0 = tout)
 
 cd dbt_project
 dbt run --profiles-dir .                  # gold
@@ -95,13 +101,24 @@ Pour mettre à jour le dashboard après un nouveau run : relancer `run_benchmark
 - Résultat : 5 250 lignes en bronze, 5 246 en silver (4 doublons retirés). 4 459 QCM et 787 vrai/faux ; 1 750 faciles, 2 400 moyennes, 1 096 difficiles.
 
 ### 6.3 Silver : enrichissement par le modèle
-- Pour chaque question, la bonne et les mauvaises réponses sont mélangées (ordre stable par question) puis présentées en choix A, B, C, D.
-- Le modèle ne répond que par une lettre (`max_tokens` = 16, `temperature` = 0).
-- Deux prompts standardisés, identifiés par `prompt_id` : `p1_en_lettre` (consigne en anglais) et `p2_fr_lettre` (consigne en français). Les questions restent en anglais.
+
+Trois prompts standardisés, identifiés par `prompt_id` et jamais modifiés après le premier run :
+
+| `prompt_id` | Libellé | Choix proposés | Réponse attendue | Langue de la consigne |
+|---|---|---|---|---|
+| `p1_english` | Encodé EN | Oui, encodés A, B, C, D | Une lettre | Anglais |
+| `p2_français` | Encodé FR | Oui, encodés A, B, C, D | Une lettre | Français |
+| `p3_libre` | Libre | Non | Quelques mots | Anglais |
+
+- **Encodé EN contre FR** : isole l'effet de la langue de la consigne.
+- **Encodé contre Libre** : isole l'effet de l'encodage (reconnaître la bonne réponse contre la retrouver).
+- Les questions restent en anglais dans tous les prompts.
+- **Encodage** : la bonne et les mauvaises réponses sont mélangées (ordre stable par question) puis présentées en choix A, B, C, D.
+- Paramètres : `temperature` = 0 (reproductibilité), `max_tokens` = 16 (lettre) ou 40 (réponse libre).
 - Colonnes écrites : `question_id`, `model`, `prompt_id`, `correct_letter`, `ai_answer`, `response_time`, `error`.
 - Les appels échoués sont enregistrés dans `error` (erreur technique) et exclus du score.
 - Reprise automatique : les combinaisons déjà traitées sont ignorées.
-- **Échantillon** : en raison du temps de réponse (environ 6,7 s par appel, soit environ 20 h pour les 5 246 questions avec 2 prompts), le run final porte sur un échantillon aléatoire reproductible (`random_state=42`) de _500 questions (à ajuster)_.
+- **Échantillon** : en raison du temps de réponse (environ 6,7 s par appel, soit environ 30 h pour les 5 246 questions avec 3 prompts), le run final porte sur un échantillon aléatoire reproductible (`random_state=42`) de **300 questions**.
 
 ### 6.4 Gold : dbt
 
@@ -110,54 +127,58 @@ Pour mettre à jour le dashboard après un nouveau run : relancer `run_benchmark
 - `stg_model_answers` : réponses du modèle.
 
 **Intermediate**
-- `int_answers_scored` : jointure réponses et questions, exclusion des appels en erreur, extraction de la lettre répondue (`ai_letter`), puis :
-  - `is_valid_format` : une lettre exploitable a été trouvée,
-  - `ai_correct` : `ai_letter` égale `correct_letter` (faux si format invalide).
-- Règle d'extraction volontairement stricte : une lettre A à H en majuscule, seule ou suivie de `.`, `:` ou `)`. Les phrases (par exemple « A cause de... ») ne sont pas comptées.
+- `int_answers_scored` : jointure réponses et questions, exclusion des appels en erreur, puis calcul de `is_valid_format` et `ai_correct` :
+  - **Prompts encodés** : lecture de la première lettre A à H en majuscule, seule ou suivie de `.`, `:` ou `)`. La réponse est juste si cette lettre est égale à `correct_letter`. Une phrase (par exemple « A cause de... ») n'est pas comptée.
+  - **Prompt libre** : textes normalisés (minuscules, sans accents ni ponctuation). QCM : la bonne réponse doit apparaître comme **mot entier** dans la réponse. Vrai/faux : la réponse doit être exactement `true` ou `false`.
 
 **Marts** (une question métier chacun)
 
-| Table | Question métier |
+| Table | Contenu |
 |---|---|
-| `accuracy_by_prompt` | Quel prompt donne les meilleures réponses, et le modèle suit-il le format demandé ? |
-| `accuracy_by_category` | Dans quelles catégories le modèle est-il le plus fort ou le plus faible ? |
-| `accuracy_by_difficulty` | La difficulté et le type de question changent-ils le score ? |
+| `accuracy_by_prompt` | Score, format respecté et temps moyen par prompt |
+| `accuracy_by_category` | Score par catégorie et par prompt |
+| `accuracy_by_difficulty` | Score par difficulté, type de question et prompt |
+| `response_time_analysis` | Temps moyen et médian selon la difficulté et la réussite |
+| `prompt_consistency` | Comparaison question par question entre Encodé EN et Encodé FR : même résultat, juste dans les deux, faux dans les deux, juste dans une seule langue |
+| `run_summary` | Nombre de questions traitées, d'appels et d'erreurs techniques |
 
 **Tests** (`dbt test`) : `question_id` unique et non nul, valeurs acceptées pour `difficulty` et `question_type`.
 
 ### 6.5 Dashboard Streamlit
-- Lit les 3 marts en lecture seule (cache de 60 s).
-- Filtres par modèle et par prompt.
-- Indicateurs : nombre de réponses, bonnes réponses, niveau du hasard, format respecté, temps moyen.
-- Trois onglets : prompts, catégories, difficulté et type de question.
-- Les scores agrégés sont des moyennes pondérées par le nombre de réponses.
+- Lit les 6 marts en lecture seule (cache de 60 s), filtres par modèle et par prompt.
+- Indicateurs : questions traitées (sur le total du dataset), réponses, bonnes réponses, niveau du hasard, format respecté, temps moyen.
+- Cinq onglets d'analyse (prompts, catégories, difficulté, temps, robustesse), chacun avec sa question métier, une aide à la lecture et les nuances à connaître.
+- Un onglet « Méthode » : pipeline, prompts, définitions, tables métier, limites.
+- Les scores agrégés sont des moyennes pondérées par le nombre de réponses ; les écarts entre prompts sont accompagnés d'une marge d'erreur à 95 %.
+- Un avertissement s'affiche quand prompts encodés et libre sont mélangés dans une même moyenne.
 
 ## 7. Résultats
 
-**Test préliminaire (50 questions)**
+**Résultat intermédiaire (environ 275 questions, prompts encodés)**
 
 | Prompt | Bonnes réponses | Format valide | Temps moyen |
 |---|---|---|---|
-| `p1_en_lettre` | 50,0 % | 100 % | 6,9 s |
-| `p2_fr_lettre` | 48,0 % | 98 % | 6,5 s |
+| Encodé EN | 44,4 % | 99,6 % | 6,2 s |
+| Encodé FR | 45,6 % | 96,0 % | 6,3 s |
 
-Le niveau du hasard est d'environ 29 % sur ce dataset (25 % en QCM, 50 % en vrai/faux). L'écart entre les deux prompts correspond à une seule question sur 50 : il n'est pas significatif.
+Le niveau du hasard est d'environ 29 % sur ce dataset (25 % en QCM, 50 % en vrai/faux). Le modèle est donc nettement au-dessus du hasard. L'écart entre les deux langues (environ 1 point) est inférieur à la marge d'erreur (environ 8 points) : il n'est pas significatif.
 
-**Run final** : _à compléter (taux global, par prompt, par catégorie, par difficulté, temps de réponse)._
+**Run final (300 questions, 3 prompts)** : _à compléter (scores par prompt, par catégorie, par difficulté, temps de réponse, robustesse EN contre FR, encodé contre libre)._
 
 ## 8. Limites connues
 
 - Scraping : 5 250 questions récupérées sur 5 299 annoncées par le site (environ 49 manquantes).
-- Fournir les choix rend la tâche plus facile que la réponse libre : le hasard donne 25 % en QCM et 50 % en vrai/faux. Les scores se lisent par rapport à ces seuils.
-- Résultats calculés sur un échantillon, pas sur la totalité du dataset (contrainte de temps et de machine).
-- Un seul petit modèle (1B paramètres) testé.
-- Règle de lecture de la réponse stricte : une réponse correcte écrite en phrase (« The answer is B ») compte comme format invalide.
+- Résultats calculés sur un échantillon de 300 questions, pas sur la totalité du dataset (contrainte de temps et de machine) : les marges d'erreur restent larges, surtout par catégorie.
+- Fournir les choix rend la tâche plus facile que la réponse libre : le hasard donne 25 % en QCM et 50 % en vrai/faux. Les scores encodés se lisent par rapport à ces seuils.
+- Correction du prompt libre approximative : une réponse juste mais reformulée est comptée fausse (scores libres plutôt sous-estimés).
+- Lecture stricte des prompts encodés : une réponse correcte écrite en phrase (« The answer is B ») compte comme format invalide.
+- Un seul petit modèle (1 milliard de paramètres) testé.
 - Les questions sont en anglais dans tous les prompts, seule la consigne change de langue.
-- Par catégorie, le nombre de réponses est faible : les scores sont à lire avec prudence.
+- Les temps de réponse dépendent de la machine utilisée.
 
 ## 9. Pistes d'amélioration
 
-- Ajouter un prompt sans choix (réponse libre) pour comparer reconnaissance et rappel.
-- Comparer plusieurs modèles.
-- Mart sur la cohérence des réponses entre les deux prompts (robustesse).
+- Comparer plusieurs modèles (la colonne `model` est déjà présente partout).
+- Augmenter la taille de l'échantillon pour réduire les marges d'erreur.
+- Corriger le prompt libre avec une mesure de similarité (par exemple distance de Levenshtein).
 - 
