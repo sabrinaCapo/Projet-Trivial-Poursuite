@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: silver
+    meta:
+      external_location: "../data/silver/{name}.parquet"
+    tables:
+      - name: questions_clean
+      - name: model_answers
