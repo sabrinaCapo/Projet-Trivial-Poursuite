@@ -2,8 +2,7 @@
 
 Pipeline de data engineering qui évalue un modèle d'IA local (LM Studio) sur le dataset Open Trivia Database (OpenTDB). Architecture en médaillon (bronze, silver, gold), transformations avec dbt et dashboard Streamlit.
 
-**Auteurs** : _à compléter (noms du binôme)_
-**Avancement** : bronze, silver, dbt et dashboard terminés. Résultats finaux à compléter (section 7).
+**Auteurs** : CAPO Kale & MUGISHA Chirac 
 
 ---
 
@@ -152,33 +151,3 @@ Trois prompts standardisés, identifiés par `prompt_id` et jamais modifiés apr
 - Les scores agrégés sont des moyennes pondérées par le nombre de réponses ; les écarts entre prompts sont accompagnés d'une marge d'erreur à 95 %.
 - Un avertissement s'affiche quand prompts encodés et libre sont mélangés dans une même moyenne.
 
-## 7. Résultats
-
-**Résultat intermédiaire (environ 275 questions, prompts encodés)**
-
-| Prompt | Bonnes réponses | Format valide | Temps moyen |
-|---|---|---|---|
-| Encodé EN | 44,4 % | 99,6 % | 6,2 s |
-| Encodé FR | 45,6 % | 96,0 % | 6,3 s |
-
-Le niveau du hasard est d'environ 29 % sur ce dataset (25 % en QCM, 50 % en vrai/faux). Le modèle est donc nettement au-dessus du hasard. L'écart entre les deux langues (environ 1 point) est inférieur à la marge d'erreur (environ 8 points) : il n'est pas significatif.
-
-**Run final (300 questions, 3 prompts)** : _à compléter (scores par prompt, par catégorie, par difficulté, temps de réponse, robustesse EN contre FR, encodé contre libre)._
-
-## 8. Limites connues
-
-- Scraping : 5 250 questions récupérées sur 5 299 annoncées par le site (environ 49 manquantes).
-- Résultats calculés sur un échantillon de 300 questions, pas sur la totalité du dataset (contrainte de temps et de machine) : les marges d'erreur restent larges, surtout par catégorie.
-- Fournir les choix rend la tâche plus facile que la réponse libre : le hasard donne 25 % en QCM et 50 % en vrai/faux. Les scores encodés se lisent par rapport à ces seuils.
-- Correction du prompt libre approximative : une réponse juste mais reformulée est comptée fausse (scores libres plutôt sous-estimés).
-- Lecture stricte des prompts encodés : une réponse correcte écrite en phrase (« The answer is B ») compte comme format invalide.
-- Un seul petit modèle (1 milliard de paramètres) testé.
-- Les questions sont en anglais dans tous les prompts, seule la consigne change de langue.
-- Les temps de réponse dépendent de la machine utilisée.
-
-## 9. Pistes d'amélioration
-
-- Comparer plusieurs modèles (la colonne `model` est déjà présente partout).
-- Augmenter la taille de l'échantillon pour réduire les marges d'erreur.
-- Corriger le prompt libre avec une mesure de similarité (par exemple distance de Levenshtein).
-- 
