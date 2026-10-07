@@ -31,11 +31,11 @@ LETTERS = "ABCDEFGH"  # lettres attribuées aux choix
 
 # Prompts standardisés (le prompt_id est conservé dans le dataset)
 PROMPTS = {
-    "p1_en_lettre": (
+    "p1_english": (
         "Answer with the letter of the correct choice only, nothing else.\n"
         "Question: {question}\n{choices}\nAnswer:"
     ),
-    "p2_fr_lettre": (
+    "p2_français": (
         "Réponds uniquement par la lettre du bon choix, rien d'autre.\n"
         "Question : {question}\n{choices}\nRéponse :"
     ),
