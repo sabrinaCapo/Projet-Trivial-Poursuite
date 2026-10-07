@@ -14,7 +14,7 @@ import streamlit as st
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "gold" / "benchmark.duckdb"
 
 # Langue de la consigne pour chaque prompt_id
-LANG = {"p1_en_lettre": "English", "p2_fr_lettre": "Français"}
+LANG = {"p1_english": "English", "p2_français": "Français"}
 COLORS = {"English": "#4C78A8", "Français": "#F58518"}
 
 st.set_page_config(page_title="Benchmark LLM", page_icon="📊", layout="wide")

@@ -1,5 +1,4 @@
 .venv/
-data/silver/*.parquet
 data/gold/*.duckdb
 dbt_project/target/
 dbt_project/logs/
