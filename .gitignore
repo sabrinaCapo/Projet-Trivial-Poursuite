@@ -10,5 +10,8 @@ __pycache__/
 dbt_project/target/
 dbt_project/logs/
 dbt_project/dbt_packages/
+# Configuration locale dbt
 dbt_project/.user.yml
+
+# Dossier de logs
 logs/
