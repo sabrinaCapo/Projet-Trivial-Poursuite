@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: silver_data
+    meta:
+      external_location: "read_parquet('../data/2_silver/questions_llm.parquet')"
+    tables:
+      - name: questions_llm

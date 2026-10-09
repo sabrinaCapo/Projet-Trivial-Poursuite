@@ -1,0 +1,16 @@
+# Scraping et données
+requests
+pandas
+pyarrow
+
+# Modèle local (nécessite aussi le logiciel Ollama : https://ollama.com)
+ollama
+
+# Couche gold et transformations
+duckdb
+dbt-core
+dbt-duckdb
+
+# Dashboard
+streamlit
+plotly

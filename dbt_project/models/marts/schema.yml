@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: mart_global_performance
+    description: "Quel est le score global du modèle pour chaque prompt ?"
+  - name: mart_performance_by_category
+    description: "Dans quelles catégories le modèle est-il le plus fort ou le plus faible ?"
+  - name: mart_performance_by_difficulty
+    description: "La difficulté de la question change-t-elle le score ?"
+  - name: mart_performance_by_type
+    description: "Le type de question (QCM ou vrai/faux) change-t-il le score, par rapport au hasard ?"
+  - name: mart_error_types
+    description: "Mauvaise option plausible ou hallucination hors options ?"
+  - name: mart_questions_detail
+    description: "Une ligne par question, lue par le dashboard."
+    columns:
+      - name: ai_correct
+        tests: [not_null]

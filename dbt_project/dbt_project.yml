@@ -1,0 +1,26 @@
+name: 'dbt_project'
+version: '1.0.0'
+config-version: 2
+
+# Ce nom doit être EXACTEMENT le même que le nom au sommet de ton fichier profiles.yml
+profile: 'dbt_project'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  dbt_project:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: view
+    marts:
+      +materialized: table
