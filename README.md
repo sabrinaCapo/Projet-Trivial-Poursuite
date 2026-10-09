@@ -2,9 +2,7 @@
 
 Pipeline de data engineering qui évalue un modèle d'IA local (`llama3.2:1b`, via Ollama) sur l'intégralité du dataset Open Trivia Database. Architecture en médaillon (bronze, silver, gold), transformations avec dbt et dashboard Streamlit qui lit la couche gold.
 
-**Auteurs** : _à compléter (noms du binôme)_
 
----
 
 ## 1. Objectif
 
@@ -177,10 +175,3 @@ Modèle `llama3.2:1b`, 5 295 questions (5 299 scrapées, 4 doublons retirés en 
 - **Temps de réponse** : un appel isolé a pris plus de 300 s, ce qui tire la moyenne vers le haut. La médiane est plus représentative.
 - **Énergie** : estimation théorique à partir du TDP du processeur, pas une mesure.
 - **Scraping** : la cible de 5 299 questions est écrite en dur dans `scrapp.py`.
-
-## 9. Pistes d'amélioration
-
-- Relancer l'inférence avec les options mélangées et comparer avec le run initial pour mesurer le biais de position.
-- Comparer plusieurs prompts (sans exemples, en français, réponse par lettre) et plusieurs modèles.
-- Ajouter une sauvegarde intermédiaire de l'inférence pour pouvoir reprendre après une interruption.
-- Améliorer la règle de correction (correspondance sur mot entier ou mesure de similarité).
